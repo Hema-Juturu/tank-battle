@@ -34,6 +34,9 @@ window.addEventListener('mousemove', (event) => {
 const keys = { w: false, a: false, s: false, d: false };
 
 window.addEventListener('keydown', (event) => {
+  if (event.code === 'Space') {
+    fire = true;
+  }
   const key = event.key.toLowerCase();
   if (key in keys) {
     keys[key as keyof typeof keys] = true;
@@ -43,6 +46,9 @@ window.addEventListener('keydown', (event) => {
 
 
 window.addEventListener('keyup', (event) => {
+  if (event.code === 'Space') {
+    fire = false;
+  }
   const key = event.key.toLowerCase();
   if (key in keys) {
     keys[key as keyof typeof keys] = false;
@@ -52,9 +58,9 @@ window.addEventListener('keyup', (event) => {
 
 
 const TANK_SIZE = 50;
-const BARREL_WIDTH = 14;
 const BARREL_LENGTH = 35;
 const SPEED = 300;
+const ROTATE_SPEED = Math.PI;
 let lastTime = performance.now();
 
 let tankX = battleField.width / 2;
@@ -68,64 +74,49 @@ const FIRE_COOLDOWN = 0.25;
 let cooldownLeft = 0;
 let fire = false;
 
-window.addEventListener('mousedown', () => {
-  fire = true;
-})
-
-window.addEventListener('mouseup', () => {
-  fire = false;
-})
 
 window.addEventListener('blur', () => {
   fire = false;
 });
-let angle = Math.atan2(mouseY - tankY, mouseX - tankX);
-let tankAngle = -Math.PI /2;
+let tankAngle = -Math.PI / 2;
 const gameLoop = (time: number) => {
+  let forward = 0;
   const dt = Math.min((time - lastTime) / 1000, 0.1);
   lastTime = time;
-  let moveX = 0, moveY = 0;
-  if (keys.w) moveY -= 1;
-  if (keys.s) moveY += 1;
-  if (keys.a) moveX -= 1;
-  if (keys.d) moveX += 1;
-
-  const length = Math.hypot(moveX, moveY);
-  if (length > 0) {
-    moveX = moveX / length;
-    moveY = moveY / length;
-    tankAngle = Math.atan2(moveY,moveX);
+  if (keys.a) {
+    tankAngle -= ROTATE_SPEED * dt;
   }
-  tankX += moveX * SPEED * dt;
-  tankY += moveY * SPEED * dt;
+  if (keys.d) {
+    tankAngle += ROTATE_SPEED * dt;
+  }
+  if (keys.w) {
+    forward = 1;
+  }
+  if (keys.s) {
+    forward = -1;
+  }
+
+  tankX += Math.cos(tankAngle) * forward * SPEED * dt;
+  tankY += Math.sin(tankAngle) * forward * SPEED * dt;
   if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
   if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
   if (tankY > battleField.height - TANK_SIZE / 2) tankY = battleField.height - TANK_SIZE / 2;
   if (tankX > battleField.width - TANK_SIZE / 2) tankX = battleField.width - TANK_SIZE / 2;
-  
   ctx.clearRect(0, 0, battleField.width, battleField.height);
-  
-  ctx.save()
-  ctx.translate(tankX,tankY)
-  ctx.rotate(tankAngle + Math.PI / 2);
-  ctx.drawImage(bodyImg, -TANK_SIZE / 2, -TANK_SIZE / 2, TANK_SIZE, TANK_SIZE);
-  ctx.restore()
 
-
-  angle = Math.atan2(mouseY - tankY, mouseX - tankX);
   ctx.save();
   ctx.translate(tankX, tankY);
-  ctx.rotate(angle - Math.PI / 2);
-  ctx.drawImage(barrelImg, -BARREL_WIDTH / 2, 0, BARREL_WIDTH, BARREL_LENGTH);
+  ctx.rotate(tankAngle + Math.PI / 2);
+  ctx.drawImage(bodyImg, -TANK_SIZE / 2, -TANK_SIZE / 2, TANK_SIZE, TANK_SIZE);
   ctx.restore();
 
   cooldownLeft -= dt;
   if (fire && cooldownLeft <= 0) {
     bullets.push({
-      x: tankX + Math.cos(angle) * BARREL_LENGTH,
-      y: tankY + Math.sin(angle) * BARREL_LENGTH,
-      vx: Math.cos(angle) * BULLET_SPEED,
-      vy: Math.sin(angle) * BULLET_SPEED,
+      x: tankX + Math.cos(tankAngle) * BARREL_LENGTH,
+      y: tankY + Math.sin(tankAngle) * BARREL_LENGTH,
+      vx: Math.cos(tankAngle) * BULLET_SPEED,
+      vy: Math.sin(tankAngle) * BULLET_SPEED,
     });
     cooldownLeft = FIRE_COOLDOWN;
   }
