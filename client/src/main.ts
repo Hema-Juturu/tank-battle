@@ -1,7 +1,7 @@
-import { TICK_RATE } from "@tank/shared";
-import "./style.css"
+import { TICK_RATE } from '@tank/shared';
+import './style.css';
 
-console.log("TICK_RATE", TICK_RATE);
+console.log('TICK_RATE', TICK_RATE);
 const battleField = document.querySelector<HTMLCanvasElement>('#battlefield');
 
 if (!battleField) throw new Error('battlefield canvas not found');
@@ -9,7 +9,7 @@ if (!battleField) throw new Error('battlefield canvas not found');
 const resizeCanvas = () => {
   battleField.width = window.innerWidth;
   battleField.height = window.innerHeight;
-}
+};
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
@@ -20,16 +20,6 @@ if (!ctx) {
 
 const bodyImg = new Image();
 bodyImg.src = '/tank-body.png';
-const barrelImg = new Image();
-barrelImg.src = '/tank-barrel.png';
-
-let mouseX = 0;
-let mouseY = 0;
-window.addEventListener('mousemove', (event) => {
-  mouseX = event.clientX;
-  mouseY = event.clientY;
-});
-
 
 const keys = { w: false, a: false, s: false, d: false };
 
@@ -43,8 +33,6 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
-
-
 window.addEventListener('keyup', (event) => {
   if (event.code === 'Space') {
     fire = false;
@@ -54,8 +42,6 @@ window.addEventListener('keyup', (event) => {
     keys[key as keyof typeof keys] = false;
   }
 });
-
-
 
 const TANK_SIZE = 50;
 const BARREL_LENGTH = 35;
@@ -74,15 +60,17 @@ const FIRE_COOLDOWN = 0.25;
 let cooldownLeft = 0;
 let fire = false;
 
-
 window.addEventListener('blur', () => {
   fire = false;
 });
+
 let tankAngle = -Math.PI / 2;
+
 const gameLoop = (time: number) => {
   let forward = 0;
   const dt = Math.min((time - lastTime) / 1000, 0.1);
   lastTime = time;
+
   if (keys.a) {
     tankAngle -= ROTATE_SPEED * dt;
   }
@@ -102,6 +90,7 @@ const gameLoop = (time: number) => {
   if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
   if (tankY > battleField.height - TANK_SIZE / 2) tankY = battleField.height - TANK_SIZE / 2;
   if (tankX > battleField.width - TANK_SIZE / 2) tankX = battleField.width - TANK_SIZE / 2;
+
   ctx.clearRect(0, 0, battleField.width, battleField.height);
 
   ctx.save();
@@ -128,6 +117,7 @@ const gameLoop = (time: number) => {
   bullets = bullets.filter(
     (b) => b.x >= 0 && b.x <= battleField.width && b.y >= 0 && b.y <= battleField.height
   );
+
   ctx.fillStyle = 'black';
   for (const b of bullets) {
     ctx.beginPath();
@@ -139,3 +129,24 @@ const gameLoop = (time: number) => {
 };
 
 requestAnimationFrame(gameLoop);
+
+const tanks = new Map<string, TankState>();
+
+const ws = new WebSocket("ws://localhost:5001");
+
+ws.addEventListener("open", () => {
+  console.log("Connected!");
+  ws.send("Hello WebSocket!");
+});
+
+ws.addEventListener("message", (event: MessageEvent) => {
+  console.log("Received:", event.data);
+});
+
+ws.addEventListener("close", () => {
+  console.log("Connection closed");
+});
+
+ws.addEventListener("error", (event: Event) => {
+  console.error("WebSocket error:", event);
+});

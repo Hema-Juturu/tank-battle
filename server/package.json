@@ -16,6 +16,8 @@
     "tsx": "^4.23.15"
   },
   "dependencies": {
-    "@tank/shared": "*"
+    "@tank/shared": "*",
+    "@types/ws": "^8.18.2",
+    "ws": "^8.22.0"
   }
 }
