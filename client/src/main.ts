@@ -1,31 +1,31 @@
-import { TICK_RATE, SPEED, ROTATE_SPEED } from '@tank/shared';
-import './style.css';
-import type { ClientMessage, Input } from '@tank/shared';
+import { TICK_RATE, SPEED, ROTATE_SPEED } from "@tank/shared";
+import "./style.css";
+import type { ClientMessage, Input } from "@tank/shared";
 
-console.log('TICK_RATE', TICK_RATE);
-const battleField = document.querySelector<HTMLCanvasElement>('#battlefield');
+console.log("TICK_RATE", TICK_RATE);
+const battleField = document.querySelector<HTMLCanvasElement>("#battlefield");
 
-if (!battleField) throw new Error('battlefield canvas not found');
+if (!battleField) throw new Error("battlefield canvas not found");
 
 const resizeCanvas = () => {
   battleField.width = window.innerWidth;
   battleField.height = window.innerHeight;
 };
 resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
 
-const ctx = battleField.getContext('2d');
+const ctx = battleField.getContext("2d");
 if (!ctx) {
-  throw new Error('2D context not available');
+  throw new Error("2D context not available");
 }
 
 const bodyImg = new Image();
-bodyImg.src = '/tank-body.png';
+bodyImg.src = "/tank-body.png";
 
 const keys = { w: false, a: false, s: false, d: false };
 
-window.addEventListener('keydown', (event) => {
-  if (event.code === 'Space') {
+window.addEventListener("keydown", (event) => {
+  if (event.code === "Space") {
     fire = true;
   }
   const key = event.key.toLowerCase();
@@ -35,8 +35,8 @@ window.addEventListener('keydown', (event) => {
   sendData();
 });
 
-window.addEventListener('keyup', (event) => {
-  if (event.code === 'Space') {
+window.addEventListener("keyup", (event) => {
+  if (event.code === "Space") {
     fire = false;
   }
   const key = event.key.toLowerCase();
@@ -61,75 +61,9 @@ const FIRE_COOLDOWN = 0.25;
 let cooldownLeft = 0;
 let fire = false;
 
-window.addEventListener('blur', () => {
+window.addEventListener("blur", () => {
   fire = false;
 });
-const id = crypto.randomUUID();
-let tanks = [{
-  id,
-  x: Math.random() * 800,
-  y: Math.random() * 600,
-  angle: -Math.PI / 2
-}]
-
-const gameLoop = (time: number) => {
-  if(!tanks){
-   requestAnimationFrame(gameLoop);
-  }
-  tanks.forEach((tank) => {
-
-    const dt = Math.min((time - lastTime) / 1000, 0.1);
-    lastTime = time;
-
-    tankX = tank.x;
-    tankY = tank.y;
-    if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
-    if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
-    if (tankY > battleField.height - TANK_SIZE / 2) tankY = battleField.height - TANK_SIZE / 2;
-    if (tankX > battleField.width - TANK_SIZE / 2) tankX = battleField.width - TANK_SIZE / 2;
-
-    ctx.clearRect(0, 0, battleField.width, battleField.height);
-
-    ctx.save();
-    ctx.translate(tankX, tankY);
-    ctx.rotate(tank.angle + Math.PI / 2);
-    ctx.drawImage(bodyImg, -TANK_SIZE / 2, -TANK_SIZE / 2, TANK_SIZE, TANK_SIZE);
-    ctx.restore();
-
-    cooldownLeft -= dt;
-    if (fire && cooldownLeft <= 0) {
-      bullets.push({
-        x: tankX + Math.cos(tank.angle) * BARREL_LENGTH,
-        y: tankY + Math.sin(tank.angle) * BARREL_LENGTH,
-        vx: Math.cos(tank.angle) * BULLET_SPEED,
-        vy: Math.sin(tank.angle) * BULLET_SPEED,
-      });
-      cooldownLeft = FIRE_COOLDOWN;
-    }
-
-    for (const b of bullets) {
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-    }
-    bullets = bullets.filter(
-      (b) => b.x >= 0 && b.x <= battleField.width && b.y >= 0 && b.y <= battleField.height
-    );
-
-    ctx.fillStyle = 'black';
-    for (const b of bullets) {
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-  })
-
-
-  requestAnimationFrame(gameLoop);
-};
-
-requestAnimationFrame(gameLoop);
-
 
 const ws = new WebSocket("ws://localhost:5001");
 
@@ -138,26 +72,87 @@ const sendData = () => {
     return;
   }
   const input: Input = {
-    ...keys, fire
-  }
+    ...keys,
+    fire,
+  };
   const message: ClientMessage = {
     type: "input",
     input,
   };
 
   ws.send(JSON.stringify(message));
-}
+};
 
 ws.addEventListener("open", () => {
   console.log("Connected!");
 });
 
-
 ws.addEventListener("message", (event: MessageEvent) => {
-  const msg = JSON.parse(event.data)
-  // console.log("message",msg)
-  tanks = msg.tanks;
-    // console.log("tanks",tanks)
+  const msg = JSON.parse(event.data);
+  const tanks = msg.tanks;
+  const gameLoop = (time: number) => {
+   const dt = 1/TICK_RATE;
+    lastTime = time;
+    
+    ctx.clearRect(0, 0, battleField.width, battleField.height);
+    tanks.forEach((tank: any) => {
+
+      tankX = tank.x;
+      tankY = tank.y;
+      if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
+      if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
+      if (tankY > battleField.height - TANK_SIZE / 2)
+        tankY = battleField.height - TANK_SIZE / 2;
+      if (tankX > battleField.width - TANK_SIZE / 2)
+        tankX = battleField.width - TANK_SIZE / 2;
+
+      ctx.save();
+      ctx.translate(tankX, tankY);
+      ctx.rotate(tank.angle + Math.PI / 2);
+      ctx.drawImage(
+        bodyImg,
+        -TANK_SIZE / 2,
+        -TANK_SIZE / 2,
+        TANK_SIZE,
+        TANK_SIZE,
+      );
+      ctx.restore();
+
+      cooldownLeft -= dt;
+      if (tank.fire && cooldownLeft <= 0) {
+        bullets.push({
+          x: tankX + Math.cos(tank.angle) * BARREL_LENGTH,
+          y: tankY + Math.sin(tank.angle) * BARREL_LENGTH,
+          vx: Math.cos(tank.angle) * BULLET_SPEED,
+          vy: Math.sin(tank.angle) * BULLET_SPEED,
+        });
+        cooldownLeft = FIRE_COOLDOWN;
+      }
+    });
+
+    for (const b of bullets) {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+    bullets = bullets.filter(
+      (b) =>
+        b.x >= 0 &&
+        b.x <= battleField.width &&
+        b.y >= 0 &&
+        b.y <= battleField.height,
+    );
+
+    ctx.fillStyle = "black";
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    requestAnimationFrame(gameLoop);
+  };
+
+  requestAnimationFrame(gameLoop);
 });
 
 ws.addEventListener("close", () => {

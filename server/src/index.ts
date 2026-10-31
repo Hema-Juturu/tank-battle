@@ -33,6 +33,7 @@ wss.on("listening", () => {
                 }
                 tank.x += Math.cos(tank.angle) * forward * SPEED * dt;
                 tank.y += Math.sin(tank.angle) * forward * SPEED * dt;
+                tank.fire = input.fire;
             })
             const msg: ServerMessage = { type: 'state', tanks: [...tanks.values()] };
             wss.clients.forEach((client) => {
@@ -50,6 +51,7 @@ wss.on("connection", (ws) => {
         x: Math.random() * 800,
         y: Math.random() * 600,
         angle: -Math.PI / 2,
+        fire: false,
     };
     tanks.set(id, tank);
 
@@ -63,8 +65,6 @@ wss.on("connection", (ws) => {
         if (message.type === 'input') {
             keys.set(id, message.input)
         }
-        console.log("Server received:", message);
-        console.log("keys", keys)
 
     });
 

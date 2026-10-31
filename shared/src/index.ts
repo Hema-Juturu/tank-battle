@@ -1,4 +1,4 @@
-export const TICK_RATE = 10;
+export const TICK_RATE = 20;
 export const ROTATE_SPEED = Math.PI;
 export const SPEED = 300;
 export type TankState = {
@@ -6,6 +6,7 @@ export type TankState = {
     x: number;
     y: number;
     angle: number;
+    fire: boolean;
 };
 
 export type Input = {
