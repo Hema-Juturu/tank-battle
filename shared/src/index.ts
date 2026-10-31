@@ -1,5 +1,6 @@
 export const TICK_RATE = 10;
-
+export const ROTATE_SPEED = Math.PI;
+export const SPEED = 300;
 export type TankState = {
     id: string;
     x: number;

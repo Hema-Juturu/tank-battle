@@ -1,5 +1,6 @@
-import { TICK_RATE } from '@tank/shared';
+import { TICK_RATE, SPEED, ROTATE_SPEED } from '@tank/shared';
 import './style.css';
+import type { ClientMessage, Input } from '@tank/shared';
 
 console.log('TICK_RATE', TICK_RATE);
 const battleField = document.querySelector<HTMLCanvasElement>('#battlefield');
@@ -31,6 +32,7 @@ window.addEventListener('keydown', (event) => {
   if (key in keys) {
     keys[key as keyof typeof keys] = true;
   }
+  sendData();
 });
 
 window.addEventListener('keyup', (event) => {
@@ -41,12 +43,11 @@ window.addEventListener('keyup', (event) => {
   if (key in keys) {
     keys[key as keyof typeof keys] = false;
   }
+  sendData();
 });
 
 const TANK_SIZE = 50;
 const BARREL_LENGTH = 35;
-const SPEED = 300;
-const ROTATE_SPEED = Math.PI;
 let lastTime = performance.now();
 
 let tankX = battleField.width / 2;
@@ -63,84 +64,100 @@ let fire = false;
 window.addEventListener('blur', () => {
   fire = false;
 });
-
-let tankAngle = -Math.PI / 2;
+const id = crypto.randomUUID();
+let tanks = [{
+  id,
+  x: Math.random() * 800,
+  y: Math.random() * 600,
+  angle: -Math.PI / 2
+}]
 
 const gameLoop = (time: number) => {
-  let forward = 0;
-  const dt = Math.min((time - lastTime) / 1000, 0.1);
-  lastTime = time;
-
-  if (keys.a) {
-    tankAngle -= ROTATE_SPEED * dt;
+  if(!tanks){
+   requestAnimationFrame(gameLoop);
   }
-  if (keys.d) {
-    tankAngle += ROTATE_SPEED * dt;
-  }
-  if (keys.w) {
-    forward = 1;
-  }
-  if (keys.s) {
-    forward = -1;
-  }
+  tanks.forEach((tank) => {
 
-  tankX += Math.cos(tankAngle) * forward * SPEED * dt;
-  tankY += Math.sin(tankAngle) * forward * SPEED * dt;
-  if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
-  if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
-  if (tankY > battleField.height - TANK_SIZE / 2) tankY = battleField.height - TANK_SIZE / 2;
-  if (tankX > battleField.width - TANK_SIZE / 2) tankX = battleField.width - TANK_SIZE / 2;
+    const dt = Math.min((time - lastTime) / 1000, 0.1);
+    lastTime = time;
 
-  ctx.clearRect(0, 0, battleField.width, battleField.height);
+    tankX = tank.x;
+    tankY = tank.y;
+    if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
+    if (tankY < TANK_SIZE / 2) tankY = TANK_SIZE / 2;
+    if (tankY > battleField.height - TANK_SIZE / 2) tankY = battleField.height - TANK_SIZE / 2;
+    if (tankX > battleField.width - TANK_SIZE / 2) tankX = battleField.width - TANK_SIZE / 2;
 
-  ctx.save();
-  ctx.translate(tankX, tankY);
-  ctx.rotate(tankAngle + Math.PI / 2);
-  ctx.drawImage(bodyImg, -TANK_SIZE / 2, -TANK_SIZE / 2, TANK_SIZE, TANK_SIZE);
-  ctx.restore();
+    ctx.clearRect(0, 0, battleField.width, battleField.height);
 
-  cooldownLeft -= dt;
-  if (fire && cooldownLeft <= 0) {
-    bullets.push({
-      x: tankX + Math.cos(tankAngle) * BARREL_LENGTH,
-      y: tankY + Math.sin(tankAngle) * BARREL_LENGTH,
-      vx: Math.cos(tankAngle) * BULLET_SPEED,
-      vy: Math.sin(tankAngle) * BULLET_SPEED,
-    });
-    cooldownLeft = FIRE_COOLDOWN;
-  }
+    ctx.save();
+    ctx.translate(tankX, tankY);
+    ctx.rotate(tank.angle + Math.PI / 2);
+    ctx.drawImage(bodyImg, -TANK_SIZE / 2, -TANK_SIZE / 2, TANK_SIZE, TANK_SIZE);
+    ctx.restore();
 
-  for (const b of bullets) {
-    b.x += b.vx * dt;
-    b.y += b.vy * dt;
-  }
-  bullets = bullets.filter(
-    (b) => b.x >= 0 && b.x <= battleField.width && b.y >= 0 && b.y <= battleField.height
-  );
+    cooldownLeft -= dt;
+    if (fire && cooldownLeft <= 0) {
+      bullets.push({
+        x: tankX + Math.cos(tank.angle) * BARREL_LENGTH,
+        y: tankY + Math.sin(tank.angle) * BARREL_LENGTH,
+        vx: Math.cos(tank.angle) * BULLET_SPEED,
+        vy: Math.sin(tank.angle) * BULLET_SPEED,
+      });
+      cooldownLeft = FIRE_COOLDOWN;
+    }
 
-  ctx.fillStyle = 'black';
-  for (const b of bullets) {
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-  }
+    for (const b of bullets) {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+    bullets = bullets.filter(
+      (b) => b.x >= 0 && b.x <= battleField.width && b.y >= 0 && b.y <= battleField.height
+    );
+
+    ctx.fillStyle = 'black';
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+  })
+
 
   requestAnimationFrame(gameLoop);
 };
 
 requestAnimationFrame(gameLoop);
 
-const tanks = new Map<string, TankState>();
 
 const ws = new WebSocket("ws://localhost:5001");
 
+const sendData = () => {
+  if (ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+  const input: Input = {
+    ...keys, fire
+  }
+  const message: ClientMessage = {
+    type: "input",
+    input,
+  };
+
+  ws.send(JSON.stringify(message));
+}
+
 ws.addEventListener("open", () => {
   console.log("Connected!");
-  ws.send("Hello WebSocket!");
 });
 
+
 ws.addEventListener("message", (event: MessageEvent) => {
-  console.log("Received:", event.data);
+  const msg = JSON.parse(event.data)
+  // console.log("message",msg)
+  tanks = msg.tanks;
+    // console.log("tanks",tanks)
 });
 
 ws.addEventListener("close", () => {
