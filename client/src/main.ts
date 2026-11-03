@@ -7,20 +7,30 @@ const battleField = document.querySelector<HTMLCanvasElement>("#battlefield");
 
 if (!battleField) throw new Error("battlefield canvas not found");
 
+const ctx = battleField.getContext("2d");
+
 const resizeCanvas = () => {
-  battleField.width = window.innerWidth;
-  battleField.height = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+
+  battleField.width = window.innerWidth * dpr;
+  battleField.height = window.innerHeight * dpr;
+
+  battleField.style.width = `${window.innerWidth}px`;
+  battleField.style.height = `${window.innerHeight}px`;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 };
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
-const ctx = battleField.getContext("2d");
 if (!ctx) {
   throw new Error("2D context not available");
 }
 
 const bodyImg = new Image();
 bodyImg.src = "/tank-body.png";
+const bulletImg = new Image();
+bulletImg.src = "/bullet.png";
 
 const keys = { w: false, a: false, s: false, d: false };
 
@@ -48,15 +58,14 @@ window.addEventListener("keyup", (event) => {
 
 const TANK_SIZE = 50;
 const BARREL_LENGTH = 35;
-let lastTime = performance.now();
 
 let tankX = battleField.width / 2;
 let tankY = battleField.height / 2;
 
-type Bullet = { x: number; y: number; vx: number; vy: number };
+type Bullet = { x: number; y: number; vx: number; vy: number; angle: number };
 let bullets: Bullet[] = [];
-const BULLET_SPEED = 600;
-const BULLET_RADIUS = 4;
+const BULLET_SPEED = 500;
+const BULLET_RADIUS = 6;
 const FIRE_COOLDOWN = 0.25;
 let cooldownLeft = 0;
 let fire = false;
@@ -90,13 +99,11 @@ ws.addEventListener("open", () => {
 ws.addEventListener("message", (event: MessageEvent) => {
   const msg = JSON.parse(event.data);
   const tanks = msg.tanks;
-  const gameLoop = (time: number) => {
-   const dt = 1/TICK_RATE;
-    lastTime = time;
-    
+  const gameLoop = () => {
+    const dt = 1 / TICK_RATE;
+
     ctx.clearRect(0, 0, battleField.width, battleField.height);
     tanks.forEach((tank: any) => {
-
       tankX = tank.x;
       tankY = tank.y;
       if (tankX < TANK_SIZE / 2) tankX = TANK_SIZE / 2;
@@ -125,29 +132,36 @@ ws.addEventListener("message", (event: MessageEvent) => {
           y: tankY + Math.sin(tank.angle) * BARREL_LENGTH,
           vx: Math.cos(tank.angle) * BULLET_SPEED,
           vy: Math.sin(tank.angle) * BULLET_SPEED,
+          angle: tank.angle,
         });
         cooldownLeft = FIRE_COOLDOWN;
       }
+      for (const b of bullets) {
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+      }
+      bullets = bullets.filter(
+        (b) =>
+          b.x >= 0 &&
+          b.x <= battleField.width &&
+          b.y >= 0 &&
+          b.y <= battleField.height,
+      );
+
+      for (const b of bullets) {
+         ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.angle + Math.PI / 2);
+        ctx.drawImage(
+          bulletImg,
+          - BULLET_RADIUS,
+          - BULLET_RADIUS,
+          BULLET_RADIUS * 2,
+          BULLET_RADIUS * 2,
+        );
+         ctx.restore();
+      }
     });
-
-    for (const b of bullets) {
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-    }
-    bullets = bullets.filter(
-      (b) =>
-        b.x >= 0 &&
-        b.x <= battleField.width &&
-        b.y >= 0 &&
-        b.y <= battleField.height,
-    );
-
-    ctx.fillStyle = "black";
-    for (const b of bullets) {
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     requestAnimationFrame(gameLoop);
   };
